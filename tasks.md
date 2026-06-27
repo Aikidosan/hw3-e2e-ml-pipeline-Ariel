@@ -64,7 +64,7 @@ Create `dags/evaluate_agent.py` (or extend existing) with these tasks:
 
 ## Phase 3 — Production polish  *(grading: 10% + 10%)*
 
-- [ ] ⏭️ Replace subprocess calls with `DockerOperator` — N/A: agent/eval already run in Docker (DooD via mounted socket); the subprocess→.venv pattern is the documented isolation approach
+- [x] ⏭️ Replace subprocess calls with `DockerOperator` — N/A by design: agent/eval already run in Docker (DooD via mounted socket) and Airflow shells out to the bind-mounted `.venv`, so containerized + dependency-isolated execution is already achieved. Rationale documented explicitly in REPORT §7 (next step at scale is `KubernetesPodOperator`).
 - [x] ✅ `docker-compose.yaml` for Airflow + MLflow + MinIO (+ postgres) — full stack, `docker/Dockerfile.airflow`; **verified end-to-end**: `compose_run_03` all 6 tasks green (agent+eval via DooD, upload→MinIO, log→MLflow server)
 - [x] ✅ MLflow reachable & used by DAG — now an MLflow **server** container (:5000), artifacts on MinIO via `--serve-artifacts`
 - [x] ✅ MinIO (S3) — folded into compose (:9000/:9001), bucket auto-created by `minio-init`, data volume reused
