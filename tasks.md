@@ -64,7 +64,7 @@ Create `dags/evaluate_agent.py` (or extend existing) with these tasks:
 
 ## Phase 3 — Production polish  *(grading: 10% + 10%)*
 
-- [x] ✅ `DockerOperator` path — eval can run via `DockerOperator` in the project `Dockerfile` image (`run_eval_docker`), selectable per-run with `eval_executor=docker`; default stays the verified subprocess path. `@task.branch` (`choose_eval`) routes; `summarize` uses `none_failed_min_one_success`; import guarded so the DAG parses without the docker provider; compose image now installs `apache-airflow-providers-docker`. ⚠️ Implemented + parses (py_compile) but **not yet run e2e on the VM**.
+- [x] ✅ `DockerOperator` path — eval can run via `DockerOperator` in the project `Dockerfile` image (`run_eval_docker`), selectable per-run with `eval_executor=docker`; default stays the verified subprocess path. `@task.branch` (`choose_eval`) routes; `summarize` uses `none_failed_min_one_success`; import guarded so the DAG parses without the docker provider; compose image installs `apache-airflow-providers-docker`. **Verified e2e** on VM compose (`docker-op-01`, resolve_rate 1.0). Gotcha fixed: command wrapped as `["/bin/sh","-c",...]` (DockerOperator execs argv directly).
 - [x] ✅ `docker-compose.yaml` for Airflow + MLflow + MinIO (+ postgres) — full stack, `docker/Dockerfile.airflow`; **verified end-to-end**: `compose_run_03` all 6 tasks green (agent+eval via DooD, upload→MinIO, log→MLflow server)
 - [x] ✅ MLflow reachable & used by DAG — now an MLflow **server** container (:5000), artifacts on MinIO via `--serve-artifacts`
 - [x] ✅ MinIO (S3) — folded into compose (:9000/:9001), bucket auto-created by `minio-init`, data volume reused

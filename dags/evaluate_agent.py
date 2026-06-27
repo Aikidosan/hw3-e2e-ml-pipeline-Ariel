@@ -188,7 +188,9 @@ def evaluate_agent():
         run_eval_docker = DockerOperator(
             task_id="run_eval_docker",
             image="{{ params.eval_image }}",
-            command=docker_eval_command,
+            # DockerOperator execs argv directly (no implicit shell), so wrap the
+            # script in `sh -c` — otherwise `&&`/`cd`/`set` aren't understood.
+            command=["/bin/sh", "-c", docker_eval_command],
             docker_url="unix:///var/run/docker.sock",
             network_mode="bridge",
             auto_remove="success",

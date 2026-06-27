@@ -246,10 +246,13 @@ To use the docker path, build the project image once:
 docker build -t mlops-assignment:latest .
 ```
 
-> **Status:** the `subprocess` path is verified end-to-end (standalone +
-> compose). The `DockerOperator` path is implemented and parses but has **not
-> yet been run end-to-end on the VM** — build the image above and trigger with
-> `eval_executor=docker` to exercise it.
+> **Status:** both paths are verified end-to-end on the VM compose stack. The
+> `DockerOperator` path was confirmed with run `docker-op-01`
+> (`eval_executor=docker`, slice 0:1): `choose_eval` routed to `run_eval_docker`,
+> `run_eval` was skipped, the eval ran in `mlops-assignment:latest`, and the
+> instance resolved (`resolve_rate=1.0`). Note: `DockerOperator` execs `argv`
+> directly, so the eval command is wrapped as `["/bin/sh", "-c", <script>]` —
+> a bare string would try to exec `set`/`cd` as binaries.
 
 For *large-scale* isolated execution the natural next step beyond either is
 `KubernetesPodOperator`.
