@@ -219,22 +219,40 @@ In-cluster endpoints (`S3_ENDPOINT_URL=http://minio:9000`,
 `MLFLOW_TRACKING_URI=http://mlflow:5000`) are injected via compose `environment`
 and override the localhost defaults in `.env`.
 
-**Why not `DockerOperator`?** The goal behind that recommendation — keep the
-heavy agent/eval workloads out of Airflow's own process — is already met. Two
-facts make `DockerOperator` redundant here:
+**Execution isolation — two selectable paths.** The eval step can run either
+way, chosen per-run via the `eval_executor` param:
 
-1. `mini-swe-agent` and the SWE-bench harness *already* spawn one Docker
-   container **per instance** on the host daemon (via the mounted socket, DooD).
-   The real work is containerized regardless of which operator triggers it;
-   wrapping the trigger in `DockerOperator` would nest a container whose only job
-   is to launch more containers.
-2. Airflow shells out to the bind-mounted project **`.venv`** via `subprocess`,
-   so its orchestration env never carries the `mini-swe-agent` / `swebench` /
-   `mlflow` deps — the same dependency isolation `DockerOperator` would provide.
+- `eval_executor=subprocess` *(default, the verified path)* — Airflow shells out
+  to the bind-mounted project **`.venv`**, so its orchestration env never carries
+  the `mini-swe-agent` / `swebench` / `mlflow` deps. The agent and eval still
+  spawn one Docker container **per instance** on the host daemon (via the mounted
+  socket, DooD), so the heavy work is already containerized.
+- `eval_executor=docker` *(preferred production style)* — a **`DockerOperator`**
+  (`run_eval_docker`) runs the SWE-bench harness inside the **project
+  `Dockerfile` image** (`mlops-assignment:latest`). The repo is bind-mounted at
+  the same absolute path and the docker socket is shared, so the harness can
+  still spawn its per-instance containers on the host daemon.
 
-So the architectural intent (containerized, dependency-isolated execution) is
-satisfied by DooD + venv subprocess. For *large-scale* isolated execution the
-natural next step is `KubernetesPodOperator`, not `DockerOperator`.
+A `@task.branch` (`choose_eval`) routes to one path; `summarize` uses
+`trigger_rule=none_failed_min_one_success` so the skipped branch doesn't block
+it. The `DockerOperator` import is guarded — if the `docker` provider isn't
+installed in a bare standalone Airflow the DAG still parses and only the
+subprocess path is offered (the compose Airflow image installs
+`apache-airflow-providers-docker`).
+
+To use the docker path, build the project image once:
+
+```bash
+docker build -t mlops-assignment:latest .
+```
+
+> **Status:** the `subprocess` path is verified end-to-end (standalone +
+> compose). The `DockerOperator` path is implemented and parses but has **not
+> yet been run end-to-end on the VM** — build the image above and trigger with
+> `eval_executor=docker` to exercise it.
+
+For *large-scale* isolated execution the natural next step beyond either is
+`KubernetesPodOperator`.
 
 ## 8. Status & next steps
 

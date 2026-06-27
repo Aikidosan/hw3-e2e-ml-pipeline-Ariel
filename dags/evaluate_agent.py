@@ -29,6 +29,23 @@ from pipeline.metrics import collect_metrics, write_metrics, write_manifest  # n
 
 VENV_PYTHON = PROJECT_ROOT / ".venv" / "bin" / "python"
 
+# DockerOperator is the preferred production-style way to run a step in the
+# project Dockerfile image. It's optional: the `docker` provider may be absent
+# from a bare standalone Airflow, so import it defensively. If it's missing the
+# DAG still parses and only the (verified) subprocess eval path is offered.
+try:
+    from airflow.providers.docker.operators.docker import DockerOperator  # noqa: E402
+    from docker.types import Mount  # noqa: E402
+
+    _HAS_DOCKER_PROVIDER = True
+except ImportError:  # pragma: no cover - depends on the Airflow image
+    _HAS_DOCKER_PROVIDER = False
+
+
+def _xcom(key: str) -> str:
+    """Jinja expression pulling one field from run_agent's XCom run_config."""
+    return "{{ ti.xcom_pull(task_ids='run_agent')['" + key + "'] }}"
+
 PARAMS = {
     # --- required ---
     "subset": Param(
@@ -50,6 +67,20 @@ PARAMS = {
     ),
     "cost_limit": Param(2.0, type="number", minimum=0, title="Per-instance cost limit ($)"),
     "step_limit": Param(75, type="integer", minimum=1, title="Per-instance step limit"),
+    # --- execution isolation ---
+    "eval_executor": Param(
+        "subprocess", type="string", enum=["subprocess", "docker"],
+        title="Eval executor",
+        description=(
+            "subprocess = run the SWE-bench eval in the project .venv (verified). "
+            "docker = run it via DockerOperator in the project Dockerfile image."
+        ),
+    ),
+    "eval_image": Param(
+        "mlops-assignment:latest", type="string",
+        title="Eval Docker image (used when eval_executor=docker)",
+        description="Build first with:  docker build -t mlops-assignment:latest .",
+    ),
 }
 
 
@@ -85,7 +116,11 @@ def evaluate_agent():
         print(f"[run_eval] eval output at {eval_dir}")
         return run_config
 
-    @task(retries=2, execution_timeout=timedelta(minutes=10))
+    @task(
+        retries=2,
+        execution_timeout=timedelta(minutes=10),
+        trigger_rule="none_failed_min_one_success",
+    )
     def summarize(run_config: dict) -> dict:
         """Parse reports -> metrics.json + manifest.json."""
         metrics = collect_metrics(run_config)
@@ -115,12 +150,76 @@ def evaluate_agent():
             check=True,
         )
 
+    @task.branch
+    def choose_eval(**context) -> str:
+        """Route to the eval implementation selected by the eval_executor param."""
+        mode = str(context["params"].get("eval_executor", "subprocess"))
+        if mode == "docker" and _HAS_DOCKER_PROVIDER:
+            return "run_eval_docker"
+        if mode == "docker":
+            print("[choose_eval] docker provider not installed; using subprocess")
+        return "run_eval"
+
     cfg = prepare_run()
-    cfg = run_agent(cfg)
-    cfg = run_eval(cfg)
-    cfg = summarize(cfg)
-    cfg = upload_artifacts(cfg)
-    log_mlflow(cfg)
+    agent = run_agent(cfg)
+    branch = choose_eval()
+    agent >> branch
+
+    # Path A (default, verified): eval in the project .venv via subprocess.
+    eval_subprocess = run_eval(agent)
+    branch >> eval_subprocess
+    eval_tasks: list = [eval_subprocess]
+
+    # Path B (preferred production style): eval in the project Dockerfile image.
+    # The repo is bind-mounted at the same absolute path and the docker socket is
+    # shared, so the SWE-bench harness can spawn its per-instance containers on
+    # the host daemon (Docker-out-of-Docker).
+    if _HAS_DOCKER_PROVIDER:
+        docker_eval_command = (
+            f"set -eu && mkdir -p {_xcom('eval_dir')} && cd {_xcom('eval_dir')} && "
+            "python -m swebench.harness.run_evaluation "
+            f"--dataset_name {_xcom('eval_dataset')} "
+            f"--split {_xcom('split')} "
+            f"--predictions_path {_xcom('preds_path')} "
+            f"--max_workers {_xcom('workers')} "
+            f"--run_id {_xcom('run_id')} "
+            f"--report_dir {_xcom('eval_dir')}"
+        )
+        run_eval_docker = DockerOperator(
+            task_id="run_eval_docker",
+            image="{{ params.eval_image }}",
+            command=docker_eval_command,
+            docker_url="unix:///var/run/docker.sock",
+            network_mode="bridge",
+            auto_remove="success",
+            mount_tmp_dir=False,
+            working_dir=str(PROJECT_ROOT),
+            mounts=[
+                Mount(source=str(PROJECT_ROOT), target=str(PROJECT_ROOT), type="bind"),
+                Mount(
+                    source="/var/run/docker.sock",
+                    target="/var/run/docker.sock",
+                    type="bind",
+                ),
+            ],
+            retries=1,
+            execution_timeout=timedelta(hours=2),
+            doc_md=(
+                "Run the SWE-bench eval inside the project Dockerfile image "
+                "(`mlops-assignment:latest`) via DockerOperator — the preferred "
+                "production-style execution-isolation path. Alternative to the "
+                "subprocess `run_eval` task; selected by `eval_executor=docker`."
+            ),
+        )
+        branch >> run_eval_docker
+        eval_tasks.append(run_eval_docker)
+
+    summary = summarize(agent)
+    for _eval in eval_tasks:
+        _eval >> summary
+
+    uploaded = upload_artifacts(summary)
+    log_mlflow(uploaded)
 
 
 evaluate_agent()

@@ -64,7 +64,7 @@ Create `dags/evaluate_agent.py` (or extend existing) with these tasks:
 
 ## Phase 3 — Production polish  *(grading: 10% + 10%)*
 
-- [x] ⏭️ Replace subprocess calls with `DockerOperator` — N/A by design: agent/eval already run in Docker (DooD via mounted socket) and Airflow shells out to the bind-mounted `.venv`, so containerized + dependency-isolated execution is already achieved. Rationale documented explicitly in REPORT §7 (next step at scale is `KubernetesPodOperator`).
+- [x] ✅ `DockerOperator` path — eval can run via `DockerOperator` in the project `Dockerfile` image (`run_eval_docker`), selectable per-run with `eval_executor=docker`; default stays the verified subprocess path. `@task.branch` (`choose_eval`) routes; `summarize` uses `none_failed_min_one_success`; import guarded so the DAG parses without the docker provider; compose image now installs `apache-airflow-providers-docker`. ⚠️ Implemented + parses (py_compile) but **not yet run e2e on the VM**.
 - [x] ✅ `docker-compose.yaml` for Airflow + MLflow + MinIO (+ postgres) — full stack, `docker/Dockerfile.airflow`; **verified end-to-end**: `compose_run_03` all 6 tasks green (agent+eval via DooD, upload→MinIO, log→MLflow server)
 - [x] ✅ MLflow reachable & used by DAG — now an MLflow **server** container (:5000), artifacts on MinIO via `--serve-artifacts`
 - [x] ✅ MinIO (S3) — folded into compose (:9000/:9001), bucket auto-created by `minio-init`, data volume reused
@@ -110,6 +110,8 @@ Create `dags/evaluate_agent.py` (or extend existing) with these tasks:
 | 2026-06-27 | Phase 3: wrote `docker-compose.yaml` + `docker/Dockerfile.airflow` (Airflow+MLflow server+MinIO+postgres); brought full stack up; DAG parses; verified DooD (docker socket) + venv + mlflow reachable from airflow container | `docker-compose.yaml`, `docker/Dockerfile.airflow`, `.env.example` |
 | 2026-06-27 | Debugged compose Airflow image (airflow PATH, psycopg2+asyncpg drivers, system python3 for bind-mounted venv) + MLflow `--allowed-hosts` (DNS-rebind guard); `compose_run_03` ran all 6 tasks green end-to-end; refreshed screenshots; documented deployment in REPORT §7 | `docker/Dockerfile.airflow`, `docker-compose.yaml`, `REPORT.md`, `screenshots/` |
 | 2026-06-27 | Added explicit per-task `execution_timeout` to all DAG tasks; ticked deliverables checklist; committed assignment work | `dags/evaluate_agent.py`, `tasks.md` |
+| 2026-06-27 | Documented DockerOperator trade-off explicitly in REPORT §7; pushed to new public repo `Aikidosan/hw3-e2e-ml-pipeline-Ariel` | `REPORT.md`, `tasks.md` |
+| 2026-06-27 | Added optional `DockerOperator` eval path (`run_eval_docker`) in project image, `eval_executor` param + `choose_eval` branch; added docker provider to compose image; updated REPORT §7. ⚠️ Parses but not yet run e2e on VM | `dags/evaluate_agent.py`, `docker/Dockerfile.airflow`, `REPORT.md` |
 
 ---
 

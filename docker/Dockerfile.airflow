@@ -29,6 +29,7 @@ ENV UV_TOOL_DIR=/opt/uv/tools \
 # Airflow 3.2 uses both a sync (psycopg2) and async (asyncpg) Postgres engine.
 RUN uv tool install "apache-airflow==3.2.2" \
         --with apache-airflow-providers-standard \
+        --with apache-airflow-providers-docker \
         --with psycopg2-binary \
         --with asyncpg \
  && uv python install 3.12
