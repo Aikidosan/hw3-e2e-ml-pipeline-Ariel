@@ -85,7 +85,7 @@ Create `dags/evaluate_agent.py` (or extend existing) with these tasks:
 - [x] ✅ `REPORT.md` — architecture, how to trigger DAG, artifact layout, MLflow, completed run (e2e-test-01), rerun-by-run-id instructions
 - [x] ✅ `screenshots/airflow_dag.png`, `screenshots/mlflow_runs.png` (captured via headless Chromium; script in `scripts/capture_screenshots.py`)
 - [x] ✅ `screenshots/object_storage_artifacts.png` (MinIO console showing `mlops-runs/runs/` with e2e-test-01 + e2e-test-03)
-- [ ] ⏭️ S3 upload + `.env.example` extended for MLflow/S3
+- [x] ✅ S3 upload + `.env.example` extended for MLflow/S3 — `upload_artifacts` task ships runs to MinIO (S3); `.env.example` documents `S3_*`/`AWS_*` + `MLFLOW_*` vars
 
 ---
 
@@ -112,6 +112,9 @@ Create `dags/evaluate_agent.py` (or extend existing) with these tasks:
 | 2026-06-27 | Added explicit per-task `execution_timeout` to all DAG tasks; ticked deliverables checklist; committed assignment work | `dags/evaluate_agent.py`, `tasks.md` |
 | 2026-06-27 | Documented DockerOperator trade-off explicitly in REPORT §7; pushed to new public repo `Aikidosan/hw3-e2e-ml-pipeline-Ariel` | `REPORT.md`, `tasks.md` |
 | 2026-06-27 | Added optional `DockerOperator` eval path (`run_eval_docker`) in project image, `eval_executor` param + `choose_eval` branch; added docker provider to compose image; updated REPORT §7. ⚠️ Parses but not yet run e2e on VM | `dags/evaluate_agent.py`, `docker/Dockerfile.airflow`, `REPORT.md` |
+| 2026-06-28 | Verified `DockerOperator` path e2e on VM compose (`docker-op-01`, `eval_executor=docker`): all 8 tasks green, `run_eval` skipped, eval ran in `mlops-assignment:latest`, resolve_rate 1.0. Fixed gotcha: command must be `["/bin/sh","-c",...]` (DockerOperator execs argv directly → `exec: "set" not found`) | `dags/evaluate_agent.py`, `REPORT.md`, `docker/Dockerfile.airflow` |
+| 2026-06-28 | Fixed `mlflow_runs.png` (had captured MLflow's DNS-rebind error page): added `127.0.0.1:5000` to `--allowed-hosts`, restarted mlflow, re-captured all 3 screenshots | `docker-compose.yaml`, `screenshots/` |
+| 2026-06-28 | Corrected stale checklist item (S3 upload + `.env.example`) → done | `tasks.md` |
 
 ---
 
