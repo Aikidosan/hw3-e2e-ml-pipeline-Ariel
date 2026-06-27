@@ -1,0 +1,43 @@
+# Airflow orchestrator image for the evaluate_agent pipeline.
+#
+# Mirrors the project's execution model: Airflow runs in its own (uv tool)
+# environment and the DAG shells out to the project .venv for agent / eval /
+# mlflow work. Built on ubuntu:24.04 (same as the VM) so the bind-mounted,
+# host-built .venv is ABI-compatible inside the container.
+#
+# `docker.io` + a mounted /var/run/docker.sock give Docker-out-of-Docker, so
+# mini-swe-agent and SWE-bench can spawn their per-instance containers on the
+# host daemon. The repo is bind-mounted at the SAME absolute path as on the
+# host, so those containers' volume mounts resolve correctly on the host.
+FROM ubuntu:24.04
+
+# `python3` (provides /usr/bin/python3 -> python3.12 on ubuntu 24.04) is required
+# because the bind-mounted project .venv's interpreter symlink points at the
+# system /usr/bin/python3, which is absent in the minimal ubuntu base image.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates curl docker.io git python3 \
+ && update-ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+ENV UV_TOOL_DIR=/opt/uv/tools \
+    UV_TOOL_BIN_DIR=/opt/uv/bin \
+    UV_CACHE_DIR=/opt/uv/cache \
+    UV_PYTHON_INSTALL_DIR=/opt/uv/python
+# Pin Airflow to the version used in standalone development.
+# Airflow 3.2 uses both a sync (psycopg2) and async (asyncpg) Postgres engine.
+RUN uv tool install "apache-airflow==3.2.2" \
+        --with apache-airflow-providers-standard \
+        --with psycopg2-binary \
+        --with asyncpg \
+ && uv python install 3.12
+
+# uv exposes the tool as `apache-airflow`; the real `airflow` CLI lives in the
+# tool's venv bin, so put that on PATH.
+ENV PATH="/opt/uv/tools/apache-airflow/bin:/opt/uv/bin:$PATH"
+
+# Repo is bind-mounted here at runtime (same path as on the host).
+WORKDIR /home/arielmit/mlops-assignment-e2e-ml-pipeline
+
+CMD ["airflow", "standalone"]

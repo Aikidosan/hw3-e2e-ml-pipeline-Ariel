@@ -1,0 +1,12 @@
+{
+  "total_instances": 500,
+  "submitted_instances": 1,
+  "completed_instances": 1,
+  "resolved_instances": 1,
+  "unresolved_instances": 0,
+  "empty_patch_instances": 0,
+  "error_instances": 0,
+  "resolve_rate": 1.0,
+  "resolve_rate_total": 0.002,
+  "report_file": "nebius__moonshotai__Kimi-K2.6.e2e-test-01.json"
+}

@@ -1,0 +1,22 @@
+{
+  "run_id": "e2e-test-01",
+  "split": "test",
+  "subset": "verified",
+  "workers": 1,
+  "model": "nebius/moonshotai/Kimi-K2.6",
+  "task_slice": "0:1",
+  "cost_limit": 1.0,
+  "step_limit": 40,
+  "model_slug": "nebius__moonshotai__Kimi-K2.6",
+  "eval_dataset": "princeton-nlp/SWE-bench_Verified",
+  "swebench_agent_config": "/home/arielmit/mini-swe-agent/src/minisweagent/config/benchmarks/swebench.yaml",
+  "project_root": "/home/arielmit/mlops-assignment-e2e-ml-pipeline",
+  "run_dir": "/home/arielmit/mlops-assignment-e2e-ml-pipeline/runs/e2e-test-01",
+  "agent_dir": "/home/arielmit/mlops-assignment-e2e-ml-pipeline/runs/e2e-test-01/run-agent",
+  "eval_dir": "/home/arielmit/mlops-assignment-e2e-ml-pipeline/runs/e2e-test-01/run-eval",
+  "preds_path": "/home/arielmit/mlops-assignment-e2e-ml-pipeline/runs/e2e-test-01/run-agent/preds.json",
+  "config_path": "/home/arielmit/mlops-assignment-e2e-ml-pipeline/runs/e2e-test-01/config.json",
+  "metrics_path": "/home/arielmit/mlops-assignment-e2e-ml-pipeline/runs/e2e-test-01/metrics.json",
+  "manifest_path": "/home/arielmit/mlops-assignment-e2e-ml-pipeline/runs/e2e-test-01/manifest.json",
+  "created_at": "2026-06-27T09:24:02.106569+00:00"
+}

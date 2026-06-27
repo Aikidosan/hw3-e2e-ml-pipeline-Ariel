@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HW3 — E2E ML Pipeline · Progress</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --border:#2d333b;
+    --text:#e6edf3; --muted:#8b949e; --accent:#7c83ff; --accent2:#cb4118;
+    --green:#2ea043; --greenbg:#1b3324; --yellow:#d29922; --yellowbg:#332a14;
+    --gray:#484f58;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.5}
+  .wrap{max-width:1000px;margin:0 auto;padding:32px 24px 64px}
+  header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;
+    border-bottom:1px solid var(--border);padding-bottom:20px;margin-bottom:28px}
+  h1{font-size:24px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:14px}
+  .meta{text-align:right;color:var(--muted);font-size:13px}
+  .meta b{color:var(--text)}
+
+  /* overall ring */
+  .overall{display:flex;align-items:center;gap:24px;background:var(--panel);border:1px solid var(--border);
+    border-radius:14px;padding:22px 26px;margin-bottom:28px}
+  .ring{--p:0;width:120px;height:120px;border-radius:50%;flex:0 0 auto;
+    background:conic-gradient(var(--accent) calc(var(--p)*1%), var(--panel2) 0);
+    display:grid;place-items:center;position:relative}
+  .ring::before{content:"";position:absolute;inset:12px;border-radius:50%;background:var(--panel)}
+  .ring span{position:relative;font-size:26px;font-weight:700}
+  .overall .info h2{margin:0 0 6px;font-size:18px}
+  .overall .info p{margin:0;color:var(--muted);font-size:14px}
+  .legend{margin-top:10px;display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+
+  /* pipeline */
+  .pipeline{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--panel);
+    border:1px solid var(--border);border-radius:14px;padding:18px 22px;margin-bottom:28px}
+  .pipeline .title{width:100%;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+  .stage{flex:1;min-width:120px;text-align:center;padding:12px 8px;border-radius:10px;
+    background:var(--panel2);border:1px solid var(--border);font-size:13px}
+  .stage small{display:block;color:var(--muted);font-size:11px;margin-top:3px}
+  .stage.done{border-color:var(--green);background:var(--greenbg)}
+  .stage.todo{opacity:.6}
+  .arrow{color:var(--muted);font-size:18px}
+
+  /* phase cards */
+  .phase{background:var(--panel);border:1px solid var(--border);border-radius:14px;
+    padding:20px 22px;margin-bottom:18px}
+  .phase h3{margin:0 0 4px;font-size:16px;display:flex;align-items:center;gap:10px}
+  .weight{font-size:11px;font-weight:600;color:var(--accent);background:rgba(124,131,255,.12);
+    padding:2px 8px;border-radius:20px}
+  .bar{height:8px;border-radius:6px;background:var(--panel2);overflow:hidden;margin:12px 0 14px}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#9aa0ff);border-radius:6px}
+  .bar.full i{background:linear-gradient(90deg,var(--green),#46d369)}
+  ul{list-style:none;margin:0;padding:0}
+  li{padding:5px 0 5px 28px;position:relative;font-size:14px}
+  li::before{position:absolute;left:0;top:4px;width:18px;height:18px;border-radius:5px;text-align:center;
+    font-size:12px;line-height:18px}
+  li.done{color:var(--text)}
+  li.done::before{content:"✓";background:var(--greenbg);color:var(--green);border:1px solid var(--green)}
+  li.prog{color:var(--text)}
+  li.prog::before{content:"●";background:var(--yellowbg);color:var(--yellow);border:1px solid var(--yellow)}
+  li.todo{color:var(--muted)}
+  li.todo::before{content:"";background:transparent;border:1px solid var(--gray)}
+  li.skip{color:var(--muted);text-decoration:line-through;opacity:.7}
+  li.skip::before{content:"–";border:1px solid var(--gray);color:var(--gray)}
+  .pct{float:right;color:var(--muted);font-size:13px;font-weight:600}
+  footer{margin-top:28px;color:var(--muted);font-size:12px;text-align:center}
+  .note{background:var(--yellowbg);border:1px solid var(--yellow);color:#f0d9a8;border-radius:10px;
+    padding:12px 16px;font-size:13px;margin-bottom:24px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>HW3 — End-to-End ML Pipeline</h1>
+      <div class="sub">Coding-agent evaluation · Airflow + MLflow · Nebius Academy MLOps</div>
+    </div>
+    <div class="meta">
+      <div>VM <b>Ariel-HW3</b> · 89.169.110.147</div>
+      <div>Model <b>nebius/moonshotai/Kimi-K2.6</b></div>
+      <div>Updated <b>2026-06-27</b></div>
+    </div>
+  </header>
+
+  <div class="overall">
+    <div class="ring" style="--p:96"><span>96%</span></div>
+    <div class="info">
+      <h2>Overall progress</h2>
+      <p>All graded areas complete &amp; verified end-to-end on docker-compose (compose_run_03, 6/6 green). Optional polish left: explicit task timeouts.</p>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--green)"></span>Done</span>
+        <span><span class="dot" style="background:var(--yellow)"></span>In progress</span>
+        <span><span class="dot" style="background:var(--gray)"></span>To do</span>
+        <span><span class="dot" style="background:var(--gray);opacity:.5"></span>Optional / skip</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">⚠️ Security TODO: rotate <b>NEBIUS_API_KEY</b> after submission (it was pasted in plaintext during setup).</div>
+
+  <div class="pipeline">
+    <div class="title">Target pipeline</div>
+    <div class="stage done">prepare_run<small>config.json</small></div>
+    <span class="arrow">→</span>
+    <div class="stage done">run_agent<small>mini-swe-agent</small></div>
+    <span class="arrow">→</span>
+    <div class="stage done">run_eval<small>swe-bench</small></div>
+    <span class="arrow">→</span>
+    <div class="stage done">summarize<small>metrics</small></div>
+    <span class="arrow">→</span>
+    <div class="stage done">upload_artifacts<small>S3 / MinIO</small></div>
+    <span class="arrow">→</span>
+    <div class="stage done">log_mlflow<small>MLflow</small></div>
+  </div>
+
+  <!-- PHASE 0 -->
+  <div class="phase">
+    <h3>Phase 0 — Environment setup <span class="pct">89%</span></h3>
+    <div class="bar"><i style="width:89%"></i></div>
+    <ul>
+      <li class="done">Provision Nebius CPU VM (8 CPU / 32 GB / Ubuntu 24.04 / 100 GiB)</li>
+      <li class="done">SSH alias <code>ariel-hw3</code> + 8080 port-forward</li>
+      <li class="done">Install uv · Docker · docker compose</li>
+      <li class="done">Clone repo · write <code>.env</code> · <code>uv sync</code></li>
+      <li class="done">Clone reference repos (mini-swe-agent, SWE-bench)</li>
+      <li class="done">Single-instance smoke test passed (trajectory.json)</li>
+      <li class="done">Airflow standalone running (admin/admin)</li>
+      <li class="prog">Verify example DAG end-to-end from UI (running)</li>
+    </ul>
+  </div>
+
+  <!-- PHASE 1 -->
+  <div class="phase">
+    <h3>Phase 1 — Configurable DAG <span class="weight">35%</span> <span class="pct">100%</span></h3>
+    <div class="bar full"><i style="width:100%"></i></div>
+    <ul>
+      <li class="done"><code>prepare_run</code> → runs/&lt;run-id&gt;/config.json</li>
+      <li class="done"><code>run_agent</code> → run-agent/ (trajectories + preds.json)</li>
+      <li class="done"><code>run_eval</code> → run-eval/ (logs + reports)</li>
+      <li class="done"><code>summarize_and_log</code> → metrics.json + MLflow</li>
+      <li class="done">Params: split · subset · workers · model · task_slice · run_id · cost_limit · step_limit</li>
+      <li class="done">No hard-coded experiment values · DAG parses · builders verified</li>
+      <li class="done">End-to-end run green (e2e-test-01) — agent solved astropy-12907</li>
+    </ul>
+  </div>
+
+  <!-- PHASE 2 -->
+  <div class="phase">
+    <h3>Phase 2 — Durable runs <span class="weight">20%</span> <span class="pct">100%</span></h3>
+    <div class="bar full"><i style="width:100%"></i></div>
+    <ul>
+      <li class="done">Enforce structured runs/&lt;run-id&gt;/ tree</li>
+      <li class="done">manifest.json pointing to key files (incl. trajectories)</li>
+      <li class="done">Complete sample run folder (runs/e2e-test-01)</li>
+      <li class="done">Upload artifacts to S3 (MinIO) + URI logged to MLflow ★ extra credit</li>
+    </ul>
+  </div>
+
+  <!-- MLflow -->
+  <div class="phase">
+    <h3>MLflow tracking <span class="weight">15%</span> <span class="pct">100%</span></h3>
+    <div class="bar full"><i style="width:100%"></i></div>
+    <ul>
+      <li class="done">Logging implemented (params · metrics · artifacts) — mlflow 3.14, SQLite</li>
+      <li class="done">Logged 2 completed evals (e2e-test-01 / -02)</li>
+      <li class="done">Runs comparable in MLflow UI — screenshot captured</li>
+    </ul>
+  </div>
+
+  <!-- PHASE 3 -->
+  <div class="phase">
+    <h3>Phase 3 — Production polish <span class="weight">20%</span> <span class="pct">90%</span></h3>
+    <div class="bar"><i style="width:90%"></i></div>
+    <ul>
+      <li class="done">docker-compose: Airflow + MLflow server + MinIO + postgres</li>
+      <li class="done">Verified end-to-end on compose (compose_run_03, 6/6 green)</li>
+      <li class="done">Execution isolation: agent/eval in Docker via DooD (host socket)</li>
+      <li class="done">MLflow server + MinIO artifacts; retries on tasks</li>
+      <li class="prog">Explicit per-task timeouts (optional)</li>
+    </ul>
+  </div>
+
+  <!-- Deliverables -->
+  <div class="phase">
+    <h3>Deliverables <span class="weight">10%</span> <span class="pct">100%</span></h3>
+    <div class="bar full"><i style="width:100%"></i></div>
+    <ul>
+      <li class="done">dags/evaluate_agent.py</li>
+      <li class="done">Wrapper code (pipeline/) writing into runs/&lt;run-id&gt;/</li>
+      <li class="done">Sample reproducible run folder / manifest (e2e-test-01)</li>
+      <li class="done">≥1 logged MLflow run</li>
+      <li class="done">REPORT.md (architecture, trigger, layout, rerun, one run)</li>
+      <li class="done">screenshots/ (airflow_dag, mlflow_runs, object_storage_artifacts)</li>
+    </ul>
+  </div>
+
+  <footer>Auto-generated from tasks.md · HW3 E2E ML pipeline · 2026-06-27</footer>
+</div>
+</body>
+</html>

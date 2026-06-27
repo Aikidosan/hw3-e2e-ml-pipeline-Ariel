@@ -1,0 +1,134 @@
+# Production-style deployment for the evaluate_agent pipeline.
+#
+#   docker compose up -d --build
+#
+# Brings up:
+#   - postgres : Airflow metadata DB
+#   - minio    : S3-compatible Object Storage (artifacts)   :9000 api / :9001 ui
+#   - mlflow   : MLflow tracking server (artifacts on MinIO) :5000
+#   - airflow  : standalone Airflow running the DAG          :8080
+#
+# Secrets (NEBIUS_API_KEY, AWS_* keys) come from ./.env (see .env.example).
+# In-cluster service names override the local .env values for endpoints.
+
+name: mlops-e2e
+
+x-s3-env: &s3-env
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-minioadmin123}
+  MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+  AWS_DEFAULT_REGION: us-east-1
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY:-minioadmin123}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # One-shot: create the artifacts bucket, then exit.
+  minio-init:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 ${AWS_ACCESS_KEY_ID:-minioadmin} ${AWS_SECRET_ACCESS_KEY:-minioadmin123} &&
+      mc mb -p local/${S3_BUCKET:-mlops-runs} &&
+      echo 'bucket ready' "
+
+  mlflow:
+    image: python:3.12-slim
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      <<: *s3-env
+    command: >
+      bash -c "pip install --no-cache-dir mlflow==3.14.0 boto3 >/dev/null &&
+      mlflow server --host 0.0.0.0 --port 5000
+      --allowed-hosts 'mlflow,mlflow:5000,localhost,localhost:5000,127.0.0.1'
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --artifacts-destination s3://${S3_BUCKET:-mlops-runs}/mlflow
+      --serve-artifacts"
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow-data:/mlflow
+
+  airflow:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.airflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+      minio-init:
+        condition: service_completed_successfully
+    env_file:
+      - .env                       # NEBIUS_API_KEY, AWS_* keys, S3_BUCKET
+    environment:
+      <<: *s3-env
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_FOLDER: /home/arielmit/mlops-assignment-e2e-ml-pipeline/dags
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__API__PORT: "8080"
+      # In-cluster endpoints (override the localhost values in .env)
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_BUCKET: ${S3_BUCKET:-mlops-runs}
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_EXPERIMENT_NAME: swe-bench-eval
+      # Reference repo for the agent's swebench.yaml (bind-mounted alongside).
+      MINI_SWE_AGENT_DIR: /home/arielmit/mini-swe-agent
+    # Pre-seed a known admin/admin login (Simple Auth Manager) before standalone.
+    command:
+      - /bin/bash
+      - -c
+      - |
+        mkdir -p /root/airflow
+        echo '{"admin": "admin"}' > /root/airflow/simple_auth_manager_passwords.json.generated
+        exec airflow standalone
+    ports:
+      - "8080:8080"
+    volumes:
+      # Same absolute path as on the host => Docker-out-of-Docker mounts resolve.
+      - /home/arielmit/mlops-assignment-e2e-ml-pipeline:/home/arielmit/mlops-assignment-e2e-ml-pipeline
+      - /home/arielmit/mini-swe-agent:/home/arielmit/mini-swe-agent
+      - /home/arielmit/.config/mini-swe-agent:/root/.config/mini-swe-agent:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  pgdata:
+  mlflow-data:
+  # Reuse the volume created by the standalone MinIO so existing runs persist.
+  minio-data:
+    external: true

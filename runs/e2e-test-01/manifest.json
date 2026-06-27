@@ -1,0 +1,32 @@
+{
+  "run_id": "e2e-test-01",
+  "created_at": "2026-06-27T09:41:26.113178+00:00",
+  "model": "nebius/moonshotai/Kimi-K2.6",
+  "params": {
+    "split": "test",
+    "subset": "verified",
+    "workers": 1,
+    "task_slice": "0:1",
+    "cost_limit": 1.0,
+    "step_limit": 40
+  },
+  "files": {
+    "config": "config.json",
+    "metrics": "metrics.json",
+    "predictions": "run-agent/preds.json",
+    "eval_report": "run-eval/nebius__moonshotai__Kimi-K2.6.e2e-test-01.json",
+    "eval_logs_dir": "run-eval/logs/run_evaluation/e2e-test-01",
+    "trajectories": [
+      "run-agent/astropy__astropy-12907/astropy__astropy-12907.traj.json"
+    ]
+  },
+  "metrics_summary": {
+    "submitted_instances": 1,
+    "resolved_instances": 1,
+    "resolve_rate": 1.0
+  },
+  "artifact_storage": {
+    "local_path": "/home/arielmit/mlops-assignment-e2e-ml-pipeline/runs/e2e-test-01",
+    "remote_uri": ""
+  }
+}
